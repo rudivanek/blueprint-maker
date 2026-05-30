@@ -79,6 +79,8 @@ export function useFirecrawl(apiKey: string) {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
           url,
+          // Request markdown in addition to rawHtml — markdown is extracted from the
+          // rendered DOM so it captures Elementor/page-builder content that rawHtml misses
           formats: ['rawHtml', 'markdown', 'screenshot@fullPage'],
           onlyMainContent: false,
         }),
