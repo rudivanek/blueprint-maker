@@ -203,6 +203,49 @@ Please generate the complete design.md file following the exact format specified
     }
   };
 
+  const cleanWordPressHtml = async (rawHtml: string): Promise<string | null> => {
+    setLoading(true);
+    setError(null);
+    setStatus('Cleaning WordPress HTML...');
+
+    const systemPrompt = `You are a WordPress HTML cleaner. Your job is to strip all WordPress/page-builder cruft from raw HTML and return only the clean, meaningful content structure.`;
+
+    const userMessage = `Clean the following WordPress HTML. 
+
+STRIP completely:
+- All WordPress/Gutenberg block wrappers and classes (wp-block-*, wp-content, wp-site-blocks, entry-content, etc.)
+- Elementor, Divi, WPBakery, Beaver Builder markup and wrapper divs
+- Theme headers, footers, navigation menus, sidebars, widgets, breadcrumbs
+- Admin bar, cookie notices, popups, overlays, modals
+- All <script> and <style> tags
+- All data-* attributes and aria-* attributes
+- WordPress-specific classes and IDs (wp-*, post-*, page-*, site-*, entry-*)
+- HTML comments <!-- -->
+- Tracking pixels, analytics tags, social share buttons
+
+KEEP:
+- The actual page content: h1–h6, p, ul, ol, li, blockquote, table, img (with src and alt only), a (with href only)
+- Section or div wrappers that group meaningful content (hero, features, testimonials, pricing, etc.)
+- Semantic class names that describe content purpose — strip all others
+- The overall page structure so section groupings are preserved for layout analysis
+
+Return ONLY the cleaned HTML. No explanation, no markdown fences, no backticks.
+
+RAW HTML:
+${rawHtml.substring(0, 80000)}`;
+
+    try {
+      const result = await callAI([{ role: 'user', content: userMessage }], systemPrompt);
+      setStatus('WordPress HTML cleaned.');
+      return result;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const importPageStructure = async (rawHtml: string, compactMode = false): Promise<{
     sections: Partial<Section>[];
     globals: Partial<GlobalSettings>;
@@ -266,5 +309,5 @@ Return a valid JSON object following the exact format in the system prompt. Incl
     }
   };
 
-  return { generateDesignSystem, importPageStructure, loading, status, error, provider };
+  return { generateDesignSystem, cleanWordPressHtml, importPageStructure, loading, status, error, provider };
 }
