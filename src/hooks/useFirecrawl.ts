@@ -67,46 +67,72 @@ export function useFirecrawl(apiKey: string) {
     }
   };
 
+  // Attempt a scrape with a given body, returns null on non-500 errors (rethrows those)
+  const attemptScrape = async (body: object): Promise<FirecrawlResponse | null> => {
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify(body),
+    });
+
+    if (response.status === 500) return null; // signal to retry with fallback
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Firecrawl error: ${response.status} — ${err}`);
+    }
+
+    return response.json();
+  };
+
   const scrapeForStructure = async (url: string): Promise<{ rawHtml: string; screenshot: string } | null> => {
     setLoading(true);
     setError(null);
-    setStatus('Crawling site for page structure...');
+    setStatus('Fetching HTML and screenshot...');
 
     try {
-      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({
+      // Attempt 1: full scrape with scroll actions + waitFor
+      // Actions scroll the page to trigger lazy-loaded content (footer, galleries, JS sections)
+      setStatus('Fetching page (with scroll actions)...');
+      let data = await attemptScrape({
+        url,
+        formats: ['rawHtml', 'screenshot@fullPage'],
+        onlyMainContent: false,
+        waitFor: 3000,
+        actions: [
+          { type: 'wait', milliseconds: 1000 },
+          { type: 'scroll', direction: 'down' },
+          { type: 'wait', milliseconds: 1500 },
+          { type: 'scroll', direction: 'down' },
+          { type: 'wait', milliseconds: 1500 },
+          { type: 'scroll', direction: 'up' },
+          { type: 'wait', milliseconds: 500 },
+        ],
+      });
+
+      // Attempt 2: actions not supported on this plan — retry with waitFor only
+      if (!data) {
+        setStatus('Fetching page (waitFor fallback)...');
+        data = await attemptScrape({
           url,
           formats: ['rawHtml', 'screenshot@fullPage'],
           onlyMainContent: false,
-          // Wait for JS to render dynamic content (carousels, lazy-loaded sections, etc.)
-          waitFor: 3000,
-          // Scroll the full page before capture so lazy-loaded and below-fold content
-          // (footer, product galleries, infinite-scroll sections) is fully rendered
-          actions: [
-            // Give the page an initial moment to settle after load
-            { type: 'wait', milliseconds: 1000 },
-            // Scroll to bottom — triggers lazy-load for images, sections, footer
-            { type: 'scroll', direction: 'down', selector: 'body' },
-            { type: 'wait', milliseconds: 1000 },
-            // Second scroll pass — catches content that loads progressively
-            { type: 'scroll', direction: 'down', selector: 'body' },
-            { type: 'wait', milliseconds: 1000 },
-            // Scroll back to top so the screenshot starts from the top of the page
-            { type: 'scroll', direction: 'up', selector: 'body' },
-            { type: 'wait', milliseconds: 500 },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`Firecrawl error: ${response.status} — ${err}`);
+          waitFor: 4000,
+        });
       }
 
-      const data: FirecrawlResponse = await response.json();
-      setStatus('Page structure data received.');
+      // Attempt 3: plain scrape — no extras
+      if (!data) {
+        setStatus('Fetching page (basic fallback)...');
+        data = await attemptScrape({
+          url,
+          formats: ['rawHtml', 'screenshot@fullPage'],
+          onlyMainContent: false,
+        });
+      }
+
+      if (!data) throw new Error('Firecrawl returned 500 on all attempts. Check your API key or try again.');
+
+      setStatus('Page data received.');
 
       return {
         rawHtml: data.data?.rawHtml || '',
