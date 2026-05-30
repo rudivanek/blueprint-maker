@@ -28,6 +28,7 @@ export function useFirecrawl(apiKey: string) {
         body: JSON.stringify({
           url,
           formats: ['extract', 'rawHtml'],
+          waitFor: 2000,
           extract: {
             schema: {
               type: 'object',
@@ -79,6 +80,23 @@ export function useFirecrawl(apiKey: string) {
           url,
           formats: ['rawHtml', 'screenshot@fullPage'],
           onlyMainContent: false,
+          // Wait for JS to render dynamic content (carousels, lazy-loaded sections, etc.)
+          waitFor: 3000,
+          // Scroll the full page before capture so lazy-loaded and below-fold content
+          // (footer, product galleries, infinite-scroll sections) is fully rendered
+          actions: [
+            // Give the page an initial moment to settle after load
+            { type: 'wait', milliseconds: 1000 },
+            // Scroll to bottom — triggers lazy-load for images, sections, footer
+            { type: 'scroll', direction: 'down', selector: 'body' },
+            { type: 'wait', milliseconds: 1000 },
+            // Second scroll pass — catches content that loads progressively
+            { type: 'scroll', direction: 'down', selector: 'body' },
+            { type: 'wait', milliseconds: 1000 },
+            // Scroll back to top so the screenshot starts from the top of the page
+            { type: 'scroll', direction: 'up', selector: 'body' },
+            { type: 'wait', milliseconds: 500 },
+          ],
         }),
       });
 
