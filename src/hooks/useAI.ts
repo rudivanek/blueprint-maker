@@ -203,46 +203,77 @@ Please generate the complete design.md file following the exact format specified
     }
   };
 
-  const cleanWordPressHtml = async (rawHtml: string): Promise<string | null> => {
+  // WordPress/Elementor sites render all content via JS — rawHtml is mostly empty wrappers.
+  // Firecrawl's markdown format is extracted from the *rendered* DOM, so it captures
+  // Elementor sections, footer, products, CTAs that rawHtml completely misses.
+  // This function enriches the markdown with any image URLs found in rawHtml
+  // (since markdown strips src attributes) and returns a combined content string
+  // ready to feed into importPageStructure.
+  const extractWordPressContent = async (rawHtml: string, markdown: string): Promise<string | null> => {
     setLoading(true);
     setError(null);
-    setStatus('Cleaning WordPress HTML...');
+    setStatus('Extracting WordPress/Elementor content...');
 
-    const systemPrompt = `You are a WordPress HTML cleaner. Your job is to strip all WordPress/page-builder cruft from raw HTML and return only the clean, meaningful content structure — preserving navigation, footer, media elements, and CTAs.`;
+    const systemPrompt = `You are a WordPress/Elementor page content extractor. You receive rendered markdown content and raw HTML from the same page. Your job is to combine them into a clean, structured content summary that preserves all meaningful page information for blueprint generation.`;
 
-    const userMessage = `Clean the following WordPress HTML.
+    // Pull all image URLs from rawHtml to supplement the markdown
+    const imgSrcPattern = /src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp|gif|svg)[^"']*)["']/gi;
+    const imgUrls: string[] = [];
+    let imgMatch;
+    while ((imgMatch = imgSrcPattern.exec(rawHtml)) !== null) {
+      imgUrls.push(imgMatch[1]);
+    }
+    const uniqueImgUrls = [...new Set(imgUrls)].slice(0, 50);
 
-STRIP completely:
-- WordPress/Gutenberg block wrapper classes only (wp-block-*, wp-site-blocks, entry-content wrappers) — but keep the content inside them
-- Elementor, Divi, WPBakery, Beaver Builder wrapper divs — keep their inner content
-- Admin bar, cookie notices, popups, overlays, modals
-- All <script> tags
-- All <style> tags
-- All data-* attributes
-- All aria-* attributes
-- WordPress-specific classes and IDs on wrapper elements (wp-*, post-*, page-*, site-*) — strip the class/id attribute, not the element
-- HTML comments <!-- -->
-- Tracking pixels (1x1 img tags), analytics tags, social share button scripts
+    // Pull video URLs from rawHtml
+    const videoSrcPattern = /src=["'](https?:\/\/[^"']+\.mp4[^"']*)["']/gi;
+    const videoUrls: string[] = [];
+    let videoMatch;
+    while ((videoMatch = videoSrcPattern.exec(rawHtml)) !== null) {
+      videoUrls.push(videoMatch[1]);
+    }
+    const uniqueVideoUrls = [...new Set(videoUrls)];
 
-KEEP everything meaningful:
-- <nav> and all navigation links with their href values — navigation is important for the blueprint
-- <header> and <footer> elements with their full content
-- <video> tags with src, autoplay, muted, loop attributes
-- <img> tags with src and alt attributes
-- <a> tags with href attributes (CTAs, buttons, links) — pay special attention to <a> tags styled as buttons inside sections, even if they are wrapped in multiple div layers; always preserve them with their text content and href
-- h1–h6, p, ul, ol, li, blockquote, table elements
-- <section> and <div> wrappers that group page sections — simplify their class to a single semantic name if possible (e.g. class="hero", class="features")
-- Background colors or background images set via inline style on section wrappers
-- Logo img or svg in the header
+    // Pull nav links from rawHtml (markdown often loses nav structure)
+    const navPattern = /<a[^>]+href=["'](https?:\/\/[^"']+)["'][^>]*>([^<]+)<\/a>/gi;
+    const navLinks: string[] = [];
+    let navMatch;
+    while ((navMatch = navPattern.exec(rawHtml)) !== null) {
+      navLinks.push(`${navMatch[2].trim()} → ${navMatch[1]}`);
+    }
+    const uniqueNavLinks = [...new Set(navLinks)].slice(0, 30);
 
-Return ONLY the cleaned HTML. No explanation, no markdown fences, no backticks.
+    const userMessage = `I have a WordPress/Elementor page. The rendered markdown content is below, supplemented with image URLs, video URLs, and links extracted directly from the raw HTML.
 
-RAW HTML:
-${rawHtml.substring(0, 80000)}`;
+Please produce a clean structured content summary that:
+1. Uses the markdown as the primary source for all text content, headings, section order, and copy
+2. Supplements with the image URLs — assign each image to the most logical section based on context
+3. Notes any video URLs and which section they belong to
+4. Preserves all navigation links and footer links
+5. Identifies each page section with a name, type, and content summary
+
+This summary will be used to generate a page blueprint — be thorough and preserve ALL sections, ALL copy, ALL images.
+
+---
+RENDERED PAGE MARKDOWN:
+${markdown.substring(0, 60000)}
+
+---
+IMAGE URLS FOUND IN HTML (${uniqueImgUrls.length} total):
+${uniqueImgUrls.join('\n')}
+
+---
+VIDEO URLS FOUND IN HTML:
+${uniqueVideoUrls.join('\n') || 'None'}
+
+---
+ALL LINKS FOUND IN HTML:
+${uniqueNavLinks.join('\n')}
+`;
 
     try {
       const result = await callAI([{ role: 'user', content: userMessage }], systemPrompt);
-      setStatus('WordPress HTML cleaned.');
+      setStatus('WordPress content extracted.');
       return result;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
@@ -315,5 +346,5 @@ Return a valid JSON object following the exact format in the system prompt. Incl
     }
   };
 
-  return { generateDesignSystem, cleanWordPressHtml, importPageStructure, loading, status, error, provider };
+  return { generateDesignSystem, extractWordPressContent, importPageStructure, loading, status, error, provider };
 }
