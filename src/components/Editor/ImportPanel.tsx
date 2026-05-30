@@ -18,6 +18,7 @@ type ImportStatus = 'idle' | 'loading' | 'success' | 'error' | 'truncated';
 
 export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImported, onPageUrlChange }: ImportPanelProps) {
   const [url, setUrl] = useState(pageUrl || projectUrl || '');
+  const [isWordPress, setIsWordPress] = useState(false);
   const [structureStatus, setStructureStatus] = useState<ImportStatus>('idle');
   const [currentStatus, setCurrentStatus] = useState('');
   const lastRawHtml = useRef<string | null>(null);
@@ -64,9 +65,18 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
       const crawlResult = await firecrawl.scrapeForStructure(url);
       if (!crawlResult) throw new Error(firecrawl.error || 'Firecrawl failed');
 
-      lastRawHtml.current = crawlResult.rawHtml;
+      let htmlToProcess = crawlResult.rawHtml;
+
+      if (isWordPress) {
+        setCurrentStatus('Cleaning WordPress HTML...');
+        const cleaned = await ai.cleanWordPressHtml(crawlResult.rawHtml);
+        if (!cleaned) throw new Error(ai.error || 'Failed to clean WordPress HTML');
+        htmlToProcess = cleaned;
+      }
+
+      lastRawHtml.current = htmlToProcess;
       setCurrentStatus(`Analyzing page structure with ${providerLabel}...`);
-      await runImport(crawlResult.rawHtml, false, crawlResult.screenshot);
+      await runImport(htmlToProcess, false, crawlResult.screenshot);
     } catch (e) {
       setStructureStatus('error');
       setCurrentStatus(e instanceof Error ? e.message : 'Unknown error');
@@ -112,6 +122,17 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
           </p>
         )}
       </div>
+
+      <label className="flex items-center gap-2 cursor-pointer select-none mb-3">
+        <input
+          type="checkbox"
+          checked={isWordPress}
+          onChange={e => setIsWordPress(e.target.checked)}
+          disabled={isLoading}
+          className="w-3.5 h-3.5 accent-[#2575FC]"
+        />
+        <span className="text-xs text-[#9CA3AF]">WordPress site — clean HTML before import</span>
+      </label>
 
       {!hasKeys && (
         <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 px-3 py-2.5 mb-3">
