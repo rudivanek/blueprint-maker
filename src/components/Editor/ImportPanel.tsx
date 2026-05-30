@@ -68,10 +68,14 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
       let htmlToProcess = crawlResult.rawHtml;
 
       if (isWordPress) {
-        setCurrentStatus('Cleaning WordPress HTML...');
-        const cleaned = await ai.cleanWordPressHtml(crawlResult.rawHtml);
-        if (!cleaned) throw new Error(ai.error || 'Failed to clean WordPress HTML');
-        htmlToProcess = cleaned;
+        // For Elementor/WP sites rawHtml is mostly empty JS wrappers.
+        // Use markdown (rendered DOM) + rawHtml (for image/video/link URLs) combined.
+        setCurrentStatus('Extracting WordPress/Elementor content...');
+        const extracted = await ai.extractWordPressContent(crawlResult.rawHtml, crawlResult.markdown);
+        if (!extracted) throw new Error(ai.error || 'Failed to extract WordPress content');
+        // Pass the extracted content summary as the "html" — importPageStructure
+        // treats it as content to analyze, markdown or HTML both work fine
+        htmlToProcess = extracted;
       }
 
       lastRawHtml.current = htmlToProcess;
