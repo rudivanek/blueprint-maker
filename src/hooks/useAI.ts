@@ -208,26 +208,32 @@ Please generate the complete design.md file following the exact format specified
     setError(null);
     setStatus('Cleaning WordPress HTML...');
 
-    const systemPrompt = `You are a WordPress HTML cleaner. Your job is to strip all WordPress/page-builder cruft from raw HTML and return only the clean, meaningful content structure.`;
+    const systemPrompt = `You are a WordPress HTML cleaner. Your job is to strip all WordPress/page-builder cruft from raw HTML and return only the clean, meaningful content structure — preserving navigation, footer, media elements, and CTAs.`;
 
-    const userMessage = `Clean the following WordPress HTML. 
+    const userMessage = `Clean the following WordPress HTML.
 
 STRIP completely:
-- All WordPress/Gutenberg block wrappers and classes (wp-block-*, wp-content, wp-site-blocks, entry-content, etc.)
-- Elementor, Divi, WPBakery, Beaver Builder markup and wrapper divs
-- Theme headers, footers, navigation menus, sidebars, widgets, breadcrumbs
+- WordPress/Gutenberg block wrapper classes only (wp-block-*, wp-site-blocks, entry-content wrappers) — but keep the content inside them
+- Elementor, Divi, WPBakery, Beaver Builder wrapper divs — keep their inner content
 - Admin bar, cookie notices, popups, overlays, modals
-- All <script> and <style> tags
-- All data-* attributes and aria-* attributes
-- WordPress-specific classes and IDs (wp-*, post-*, page-*, site-*, entry-*)
+- All <script> tags
+- All <style> tags
+- All data-* attributes
+- All aria-* attributes
+- WordPress-specific classes and IDs on wrapper elements (wp-*, post-*, page-*, site-*) — strip the class/id attribute, not the element
 - HTML comments <!-- -->
-- Tracking pixels, analytics tags, social share buttons
+- Tracking pixels (1x1 img tags), analytics tags, social share button scripts
 
-KEEP:
-- The actual page content: h1–h6, p, ul, ol, li, blockquote, table, img (with src and alt only), a (with href only)
-- Section or div wrappers that group meaningful content (hero, features, testimonials, pricing, etc.)
-- Semantic class names that describe content purpose — strip all others
-- The overall page structure so section groupings are preserved for layout analysis
+KEEP everything meaningful:
+- <nav> and all navigation links with their href values — navigation is important for the blueprint
+- <header> and <footer> elements with their full content
+- <video> tags with src, autoplay, muted, loop attributes
+- <img> tags with src and alt attributes
+- <a> tags with href attributes (CTAs, buttons, links)
+- h1–h6, p, ul, ol, li, blockquote, table elements
+- <section> and <div> wrappers that group page sections — simplify their class to a single semantic name if possible (e.g. class="hero", class="features")
+- Background colors or background images set via inline style on section wrappers
+- Logo img or svg in the header
 
 Return ONLY the cleaned HTML. No explanation, no markdown fences, no backticks.
 
