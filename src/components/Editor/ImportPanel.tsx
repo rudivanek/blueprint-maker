@@ -127,16 +127,23 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
         )}
       </div>
 
-      <label className="flex items-center gap-2 cursor-pointer select-none mb-3">
-        <input
-          type="checkbox"
-          checked={isWordPress}
-          onChange={e => setIsWordPress(e.target.checked)}
-          disabled={isLoading}
-          className="w-3.5 h-3.5 accent-[#2575FC]"
-        />
-        <span className="text-xs text-[#9CA3AF]">WordPress site — clean HTML before import</span>
-      </label>
+      <div className="mb-3">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isWordPress}
+            onChange={e => setIsWordPress(e.target.checked)}
+            disabled={isLoading}
+            className="w-3.5 h-3.5 accent-[#2575FC]"
+          />
+          <span className="text-xs text-[#9CA3AF]">WordPress site — clean HTML before import</span>
+        </label>
+        {isWordPress && (
+          <p className="text-[10px] text-amber-500 mt-1.5 leading-relaxed">
+            ⚠ For Elementor-based sites, leaving this unchecked may produce better results — Elementor renders content via JS which limits what the cleaner can extract.
+          </p>
+        )}
+      </div>
 
       {!hasKeys && (
         <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 px-3 py-2.5 mb-3">
