@@ -229,7 +229,7 @@ KEEP everything meaningful:
 - <header> and <footer> elements with their full content
 - <video> tags with src, autoplay, muted, loop attributes
 - <img> tags with src and alt attributes
-- <a> tags with href attributes (CTAs, buttons, links)
+- <a> tags with href attributes (CTAs, buttons, links) — pay special attention to <a> tags styled as buttons inside sections, even if they are wrapped in multiple div layers; always preserve them with their text content and href
 - h1–h6, p, ul, ol, li, blockquote, table elements
 - <section> and <div> wrappers that group page sections — simplify their class to a single semantic name if possible (e.g. class="hero", class="features")
 - Background colors or background images set via inline style on section wrappers
