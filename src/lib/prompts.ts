@@ -327,6 +327,12 @@ GOOD layout_description (ALWAYS do this when real images exist):
 
 Apply this inline embedding to every real image URL found in the section — hero backgrounds, card thumbnails, content images, gallery images, etc.
 
+### Rule 3b: PRESERVE EMPHASIS PLACEMENT IN COPY
+When a heading or title contains styled spans (e.g. <span class="italic">, <em>, or an accent-colored word), wrap EXACTLY those words in *asterisks* in the copy/title fields, e.g. "No siempre se trata de *aguantar* más." This tells the builder which precise words carry the italic/accent treatment. Never drop or relocate the emphasis.
+
+### Rule 3c: NAVIGATION DROPDOWNS AND FOOTER CONTACT DETAILS
+If a nav item has a dropdown/submenu, list every sub-item in the navigation table using the format "ParentLabel > SubLabel". In globals, capture footer contact details VERBATIM: phone numbers, street addresses, person names/credentials, and opening hours all belong in the footer description or a contact list — losing them forces the builder to either omit or invent them.
+
 ### Rule 4-PRE: IMAGE URL MANIFEST — backgrounds hidden in CSS
 The user message may include an IMAGE URL MANIFEST: every image URL found anywhere in the page source, including CSS background-image rules and builder JSON settings that are invisible in the body HTML. When a section visibly contains a photograph (per the screenshots) but has no <img> tag in the HTML, you MUST pick the best-matching manifest URL (filename keywords help) and record it in that section's images array with the correct position. A section whose screenshot shows a real photo must never end up with an empty images array when a plausible manifest URL exists.
 
@@ -511,6 +517,11 @@ The client needs to see a recognizable version of their own page structure. They
 - **FORMS:** Render input fields as static visual elements with visible labels
 - **MODALS/OVERLAYS:** Do not render — skip entirely
 - **BACKGROUND VIDEOS:** When a section's images/notes specify a background VIDEO URL (.mp4/.webm), embed it: \`<video autoplay muted loop playsinline src="VIDEO_URL"></video>\` absolutely positioned to cover the section (position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0), with the overlay and content layered above it (z-index:1+). Also set the section's background-color to the overlay hex as a fallback for when the video cannot load. Never replace a specified background video with only a flat solid color.
+- **NO INVENTED FACTS — ABSOLUTE RULE:** Never fabricate phone numbers, street addresses, opening hours, email addresses, people's names, testimonial quotes, video captions/labels, statistics, or any copy not present in the blueprint. If the blueprint does not provide a detail, OMIT that element entirely — an honest gap is correct, an invented phone number or address is a critical failure.
+- **EXACT SECTION BACKGROUNDS:** Use each section's Background hex value exactly as written in its blueprint. Never swap background colors between sections, never substitute a "nicer" tone, never lighten or darken.
+- **NO CROSS-SECTION IMAGE REUSE:** Never reuse an image assigned to one section as the background or content of a different section (e.g., do not reuse the hero photo as the CTA banner background). If a section lacks its own image, follow the MISSING BACKGROUND PHOTOS rule instead.
+- **TYPOGRAPHY FIDELITY:** Use exactly the font families named in the design system (import them from Google Fonts). Never substitute a lookalike (e.g., never swap DM Serif Display for Playfair Display). Never introduce accent colors that are not in the design system — if the design system has navy + green, do not add gold.
+- **EMPHASIS PLACEMENT:** When headline or title copy marks specific words with *asterisks* or <em>, apply the italic/accent styling to exactly those words — not the first word, not a different word.
 - **MISSING BACKGROUND PHOTOS:** When the blueprint describes a photographic background but provides NO image URL, use a dark photographic placeholder: \`https://placehold.co/1920x1080/[overlay-hex]/[overlay-hex]\` layered under the overlay, or a subtle CSS gradient between two near-identical dark tones — NEVER a single flat solid color, and NEVER invented decorative graphics, letters, watermarks, or shapes as a substitute.
 
 ## WHAT MATTERS MOST (in order)
