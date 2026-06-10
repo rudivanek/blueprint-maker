@@ -116,5 +116,39 @@ export function useFirecrawl(apiKey: string) {
     }
   };
 
-  return { scrapeForDesign, scrapeForStructure, loading, status, error };
+  /**
+   * Fetch a CSS file's text. Tries a plain fetch first (works when the host
+   * sends CORS headers); falls back to a Firecrawl scrape (server-side, no
+   * CORS limits). Returns null on failure — callers treat it as best effort.
+   */
+  const fetchCssFile = async (cssUrl: string): Promise<string | null> => {
+    // 1. Direct fetch — free and fast when CORS allows it.
+    try {
+      const r = await fetch(cssUrl);
+      if (r.ok) {
+        const text = await r.text();
+        if (text && text.length > 0) return text;
+      }
+    } catch {
+      // CORS or network — fall through to Firecrawl.
+    }
+
+    // 2. Firecrawl fallback (1 credit).
+    try {
+      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({ url: cssUrl, formats: ['rawHtml'] }),
+      });
+      if (!response.ok) return null;
+      const data: FirecrawlResponse = await response.json();
+      usageStore.reportScrape();
+      const text = data.data?.rawHtml || data.data?.markdown || '';
+      return text || null;
+    } catch {
+      return null;
+    }
+  };
+
+  return { scrapeForDesign, scrapeForStructure, fetchCssFile, loading, status, error };
 }
