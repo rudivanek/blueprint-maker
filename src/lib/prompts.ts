@@ -1,6 +1,11 @@
 import type { GlobalSettings, Page, Section } from '../types';
 
 export const DESIGN_SYSTEM_EXTRACTION_PROMPT = `You are a precision design system analyst. You will receive:
+
+## FONT AND COLOR EVIDENCE RULES (CRITICAL)
+- If the user message contains a "FONTS DETECTED IN HTML" list, those families ARE the site's fonts. Use them verbatim as --font-heading / --font-body (assign serif fonts to headings, sans-serif to body). Never substitute a similar-looking font and never state that no fonts were detected.
+- If the user message contains a "HEX COLORS FOUND IN MARKUP" list, treat the most frequent non-neutral colors (not white/black/grays) as the brand palette — these come from the site's own SVG icons and buttons. Build primary/secondary/accent tokens from them instead of inventing plausible-looking values.
+- All hex values must use ASCII characters only (0-9, A-F). Double-check there are no lookalike Unicode characters.
 1. Branding/extract data from a website (colors, fonts, brand name, logo)
 2. Raw HTML including <style> tags and inline styles from that website
 
