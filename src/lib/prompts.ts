@@ -327,6 +327,9 @@ GOOD layout_description (ALWAYS do this when real images exist):
 
 Apply this inline embedding to every real image URL found in the section — hero backgrounds, card thumbnails, content images, gallery images, etc.
 
+### Rule 4-PRE: IMAGE URL MANIFEST — backgrounds hidden in CSS
+The user message may include an IMAGE URL MANIFEST: every image URL found anywhere in the page source, including CSS background-image rules and builder JSON settings that are invisible in the body HTML. When a section visibly contains a photograph (per the screenshots) but has no <img> tag in the HTML, you MUST pick the best-matching manifest URL (filename keywords help) and record it in that section's images array with the correct position. A section whose screenshot shows a real photo must never end up with an empty images array when a plausible manifest URL exists.
+
 ### Rule 4: Detect and preserve CSS background-image properties
 When analyzing HTML, look for background-image URLs in BOTH inline styles (style="background-image: url(...)") AND class-based CSS rules in <style> tags. When found:
 - Extract the full image URL
