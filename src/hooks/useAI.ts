@@ -17,6 +17,7 @@
 import { useState } from 'react';
 import { DESIGN_SYSTEM_EXTRACTION_PROMPT, STRUCTURE_IMPORT_PROMPT } from '../lib/prompts';
 import { dataUriParts } from '../lib/screenshot';
+import { usageStore } from '../lib/usage';
 import type { Section, GlobalSettings, AIProvider } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -63,6 +64,7 @@ interface AnthropicContentBlock {
 interface AnthropicResponse {
   content: AnthropicContentBlock[];
   stop_reason?: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
 }
 
 interface AnthropicTool {
@@ -127,6 +129,9 @@ async function callAnthropic(
 
   const data: AnthropicResponse = await response.json();
 
+  // Report token usage to the global counter
+  usageStore.report('claude-sonnet-4-6', data.usage?.input_tokens ?? 0, data.usage?.output_tokens ?? 0);
+
   // Join ALL text blocks (previous version only read content[0])
   const text = (data.content || [])
     .filter(b => b.type === 'text' && typeof b.text === 'string')
@@ -152,6 +157,7 @@ async function callAnthropic(
 
 interface OpenAIResponse {
   choices: Array<{ message: { content: string }; finish_reason?: string }>;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
 function toOpenAIContent(parts: ContentPart[]): unknown {
@@ -205,6 +211,10 @@ async function callOpenAI(
   }
 
   const data: OpenAIResponse = await response.json();
+
+  // Report token usage to the global counter
+  usageStore.report('gpt-4.1', data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0);
+
   const choice = data.choices?.[0];
   return {
     text: choice?.message?.content ?? '',
