@@ -10,7 +10,6 @@ import { ScanLine, Loader2, AlertCircle, CheckCircle, RefreshCw } from 'lucide-r
 import { useFirecrawl } from '../../hooks/useFirecrawl';
 import { useAI } from '../../hooks/useAI';
 import { prepareScreenshotForAI } from '../../lib/screenshot';
-import { enrichHtmlWithExternalCss } from '../../lib/cssEnrich';
 import { toast } from '../ui/Toast';
 import { ding } from '../../lib/ding';
 import type { GlobalSettings, Section, AppSettings } from '../../types';
@@ -83,23 +82,13 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
         toast('Screenshot could not be prepared — importing from HTML only.', 'warning');
       }
 
-      // Pull element backgrounds out of external Elementor CSS files and
-      // inject them inline, so CSS-only backgrounds (doctor photo, card
-      // photos, section colors) become visible to extraction.
-      setCurrentStatus('Fetching external stylesheets for hidden backgrounds...');
-      const enrichedHtml = await enrichHtmlWithExternalCss(
-        crawlResult.rawHtml,
-        firecrawl.fetchCssFile,
-        setCurrentStatus
-      );
-
-      let htmlToProcess = enrichedHtml;
+      let htmlToProcess = crawlResult.rawHtml;
 
       if (isWordPress) {
         // For Elementor/WP sites rawHtml is mostly empty JS wrappers.
         // Use markdown (rendered DOM) + rawHtml (for image/video/link URLs) combined.
         setCurrentStatus('Extracting WordPress/Elementor content...');
-        const extracted = await ai.extractWordPressContent(enrichedHtml, crawlResult.markdown, screenshotSlices);
+        const extracted = await ai.extractWordPressContent(crawlResult.rawHtml, crawlResult.markdown, screenshotSlices);
         if (!extracted) throw new Error(ai.error || 'Failed to extract WordPress content');
         htmlToProcess = extracted;
       }
