@@ -507,6 +507,8 @@ The client needs to see a recognizable version of their own page structure. They
 - **ACCORDIONS/FAQs:** Show all items fully expanded — no collapsed state
 - **FORMS:** Render input fields as static visual elements with visible labels
 - **MODALS/OVERLAYS:** Do not render — skip entirely
+- **BACKGROUND VIDEOS:** When a section's images/notes specify a background VIDEO URL (.mp4/.webm), embed it: \`<video autoplay muted loop playsinline src="VIDEO_URL"></video>\` absolutely positioned to cover the section (position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0), with the overlay and content layered above it (z-index:1+). Also set the section's background-color to the overlay hex as a fallback for when the video cannot load. Never replace a specified background video with only a flat solid color.
+- **MISSING BACKGROUND PHOTOS:** When the blueprint describes a photographic background but provides NO image URL, use a dark photographic placeholder: \`https://placehold.co/1920x1080/[overlay-hex]/[overlay-hex]\` layered under the overlay, or a subtle CSS gradient between two near-identical dark tones — NEVER a single flat solid color, and NEVER invented decorative graphics, letters, watermarks, or shapes as a substitute.
 
 ## WHAT MATTERS MOST (in order)
 1. Section structure — every section present, in the exact order from the blueprint
@@ -552,7 +554,7 @@ The layout_contract fields mean:
 4. **Do not convert grids to stacked cards on desktop.** Grids stay grids on desktop. Only collapse to single column at mobile breakpoints as specified in mobile_layout.
 5. **Do not convert 2-column splits to centered stacks.** Image-right stays image-right. Text-left stays text-left. On desktop only.
 6. **Do not change header/footer color logic** unless the blueprint explicitly specifies a different color. Use the nav and footer style from Global Settings.
-7. **Do not add sections, content, or design elements** not in the blueprint. No decorative additions.
+7. **Do not add sections, content, or design elements** not in the blueprint. No decorative additions — no invented watermarks, oversized letters, abstract shapes, or background graphics that are not explicitly described in the blueprint.
 8. **Use the screenshot as the highest visual reference** when attached. If there is any ambiguity about column count or image placement, the screenshot resolves it.
 
 ## FILES PROVIDED
