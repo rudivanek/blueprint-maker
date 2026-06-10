@@ -455,6 +455,26 @@ function truncateHtml(html: string, firstChars: number, lastChars: number): stri
   return `${head}\n\n<!-- ... middle content truncated for length ... -->\n\n${tail}`;
 }
 
+/**
+ * Harvest EVERY image URL from the raw, uncleaned HTML — including ones that
+ * only exist inside <style> blocks (CSS background-image), Elementor
+ * data-settings JSON, preload links, srcset, and og:image meta tags.
+ * These never survive cleaning as <img> tags, which is why parallax/CSS
+ * background photos used to come through with empty src.
+ */
+function harvestImageUrls(rawHtml: string): string[] {
+  const pattern = /https?:\/\/[^\s"'()<>\\]+?\.(?:jpg|jpeg|png|webp|gif|avif)(?:\?[^\s"'()<>\\]*)?/gi;
+  const found = rawHtml.match(pattern) || [];
+  // Also catch escaped URLs inside JSON blobs like Elementor data-settings: https:\/\/...
+  const jsonEscaped = rawHtml.match(/https?:\\\/\\\/[^\s"']+?\.(?:jpg|jpeg|png|webp|gif|avif)(?:\?[^\s"']*)?/gi) || [];
+  const unescaped = jsonEscaped.map(u => u.replace(/\\\//g, '/'));
+  const all = [...found, ...unescaped]
+    .map(u => u.replace(/&amp;/g, '&'))
+    // Drop tiny theme assets that are never section backgrounds
+    .filter(u => !/(?:emoji|favicon|spinner|loader|blank|pixel|1x1)/i.test(u));
+  return [...new Set(all)].slice(0, 80);
+}
+
 // ---------------------------------------------------------------------------
 // JSON fallback parser (OpenAI path / Anthropic fallback if tool_use missing)
 // ---------------------------------------------------------------------------
@@ -563,13 +583,8 @@ Please generate the complete design.md file following the exact format specified
 
     const systemPrompt = `You are a WordPress/Elementor page content extractor. You receive rendered markdown content, raw HTML supplements, and possibly full-page screenshot slices from the same page. Your job is to combine them into a clean, structured content summary that preserves all meaningful page information for blueprint generation. When screenshots are attached, use them to determine the true visual section order and to assign images to their correct sections.`;
 
-    const imgSrcPattern = /src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp|gif|svg)[^"']*)["']/gi;
-    const imgUrls: string[] = [];
-    let imgMatch;
-    while ((imgMatch = imgSrcPattern.exec(rawHtml)) !== null) {
-      imgUrls.push(imgMatch[1]);
-    }
-    const uniqueImgUrls = [...new Set(imgUrls)].slice(0, 50);
+    // Broad harvest: catches src=, CSS url(...), data-settings JSON, preloads
+    const uniqueImgUrls = harvestImageUrls(rawHtml);
 
     const videoSrcPattern = /src=["'](https?:\/\/[^"']+\.mp4[^"']*)["']/gi;
     const videoUrls: string[] = [];
@@ -651,6 +666,11 @@ ${uniqueNavLinks.join('\n')}
     setStatus('Analyzing page structure with AI...');
 
     try {
+      // Harvest image URLs from the FULL raw HTML before any cleaning —
+      // this catches CSS background-image URLs the cleaned HTML no longer contains.
+      const imageManifest = harvestImageUrls(rawHtml);
+      console.log('Image manifest:', imageManifest.length, 'URLs');
+
       const cleaned = cleanHtml(rawHtml);
       console.log('HTML before clean:', rawHtml.length, 'chars — after clean:', cleaned.length, 'chars');
       const truncatedHtml = truncateHtml(cleaned, 150000, 50000);
@@ -664,7 +684,11 @@ ${uniqueNavLinks.join('\n')}
         ? `\n\nVISUAL REFERENCE: ${screenshots.length} full-page screenshot slice(s) of the rendered page are attached above, in top-to-bottom order. The screenshots are the HIGHEST AUTHORITY for: section boundaries and order, column counts, image positions, background images vs solid colors, overlay treatments, and which content is actually visible. Cross-check every section you extract against the screenshots. If the HTML suggests one layout but the screenshot clearly shows another, trust the screenshot.`
         : '';
 
-      const userText = `Here is the raw HTML from the webpage. Extract all sections and globals:${compactInstruction}${screenshotNote}
+      const manifestBlock = imageManifest.length > 0
+        ? `\n\nIMAGE URL MANIFEST — every image URL found ANYWHERE in the page source (including CSS background-image rules, Elementor data-settings, preloads). Many of these are section backgrounds that do NOT appear as <img> tags in the HTML below. RULE: when the screenshot clearly shows a photograph in a section but you find no <img> for it in the HTML, select the best-matching URL from this manifest (use filename hints like names, 'hero', 'doctor', subject keywords) and put it in that section's images array with the correct position (e.g. 'background', 'right-column', 'card-background'). Do not leave a section's images empty when the screenshot shows a real photo and a plausible manifest URL exists. Never assign the same manifest URL to multiple unrelated sections.\n${imageManifest.join('\n')}\n`
+        : '';
+
+      const userText = `Here is the raw HTML from the webpage. Extract all sections and globals:${compactInstruction}${screenshotNote}${manifestBlock}
 
 \`\`\`html
 ${truncatedHtml}
