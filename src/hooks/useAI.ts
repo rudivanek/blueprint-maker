@@ -456,6 +456,55 @@ function truncateHtml(html: string, firstChars: number, lastChars: number): stri
 }
 
 /**
+ * Harvest font families from Google Fonts <link> tags and @font-face rules.
+ * These links sit in the HTML head and were previously stripped before the
+ * design AI ever saw them — causing it to wrongly report "no fonts detected"
+ * and substitute lookalikes (e.g. Playfair Display instead of DM Serif Display).
+ */
+function harvestFonts(rawHtml: string): string[] {
+  const fonts = new Set<string>();
+  // Google Fonts links: css?family=DM+Serif+Display:100,...|Other and css2?family=A&family=B
+  const linkPattern = /fonts\.googleapis\.com\/css2?\?([^"'>\s]+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = linkPattern.exec(rawHtml)) !== null) {
+    const qs = m[1].replace(/&amp;/g, '&');
+    for (const param of qs.split('&')) {
+      if (!param.toLowerCase().startsWith('family=')) continue;
+      // css v1 packs several families separated by |
+      for (const fam of param.slice(7).split('|')) {
+        const name = decodeURIComponent(fam.split(':')[0]).replace(/\+/g, ' ').trim();
+        if (name) fonts.add(name);
+      }
+    }
+  }
+  // @font-face declarations in inline style blocks
+  const ffPattern = /@font-face\s*\{[^}]*font-family\s*:\s*["']?([^"';}]+)/gi;
+  while ((m = ffPattern.exec(rawHtml)) !== null) {
+    fonts.add(m[1].trim());
+  }
+  return [...fonts];
+}
+
+/**
+ * Frequency-ranked hex colors found anywhere in the markup (SVG fills,
+ * inline styles, style blocks). Inline SVG fill colors are usually the
+ * true brand palette — previously stripped with the SVG innards.
+ */
+function harvestDominantColors(rawHtml: string, top = 14): { hex: string; count: number }[] {
+  const counts = new Map<string, number>();
+  const hexPattern = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
+  const matches = rawHtml.match(hexPattern) || [];
+  for (const raw of matches) {
+    const hex = raw.toUpperCase();
+    counts.set(hex, (counts.get(hex) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([hex, count]) => ({ hex, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, top);
+}
+
+/**
  * Harvest EVERY image URL from the raw, uncleaned HTML — including ones that
  * only exist inside <style> blocks (CSS background-image), Elementor
  * data-settings JSON, preload links, srcset, and og:image meta tags.
@@ -534,6 +583,18 @@ export function useAI(provider: AIProvider, anthropicKey: string, openaiKey: str
         ? `\n\nIMPORTANT: ${screenshots.length} full-page screenshot slice(s) of the rendered page are attached above (top-to-bottom). Use them as the AUTHORITATIVE source for actual rendered colors (nav background, button colors, section backgrounds, text colors) and visual font characteristics (serif vs sans-serif, weight). The CSS text below may contain unused rules — the screenshot shows what is actually rendered. If the CSS and the screenshot disagree, trust the screenshot.`
         : '';
 
+      // Fonts from Google Fonts <link> tags / @font-face — authoritative.
+      const detectedFonts = harvestFonts(rawHtml);
+      const fontsBlock = detectedFonts.length > 0
+        ? `\n\nFONTS DETECTED IN HTML (Google Fonts links / @font-face) — these are the site's REAL fonts. Use them as the heading/body families. Do NOT substitute lookalikes and do NOT claim no fonts were found:\n${detectedFonts.join('\n')}`
+        : '\n\nNo font links or @font-face rules were found in the HTML. Infer serif/sans-serif character from the screenshot and clearly mark the chosen families as PLACEHOLDERS to verify manually.';
+
+      // Frequency-ranked hex colors from markup (SVG fills = brand palette).
+      const dominantColors = harvestDominantColors(rawHtml);
+      const colorsBlock = dominantColors.length > 0
+        ? `\n\nHEX COLORS FOUND IN MARKUP, ranked by frequency (inline SVG icon/button fills are usually the true brand palette — incorporate the most frequent non-neutral ones as primary/accent colors rather than inventing values):\n${dominantColors.map(c => `${c.hex} (×${c.count})`).join('\n')}`
+        : '';
+
       const userText = `Here is the branding extract data from the website:
 \`\`\`json
 ${JSON.stringify(extractData, null, 2)}
@@ -547,9 +608,9 @@ ${cssBlocks.slice(0, 8).join('\n\n').substring(0, 80000)}
 Sample inline styles found:
 \`\`\`
 ${inlineStyles.slice(0, 80).join('\n')}
-\`\`\`${screenshotNote}
+\`\`\`${screenshotNote}${fontsBlock}${colorsBlock}
 
-Please generate the complete design.md file following the exact format specified in the system prompt. Resolve ALL CSS variables to their actual hex values.`;
+Please generate the complete design.md file following the exact format specified in the system prompt. Resolve ALL CSS variables to their actual hex values. Every hex value you output must be valid ASCII (characters 0-9, A-F only).`;
 
       setStatus(`AI is generating design system${screenshots.length > 0 ? ' (with visual reference)' : ''}...`);
 
