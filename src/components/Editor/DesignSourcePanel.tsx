@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Link, ExternalLink, Upload, Code, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { useFirecrawl } from '../../hooks/useFirecrawl';
 import { useAI } from '../../hooks/useAI';
+import { prepareScreenshotForAI } from '../../lib/screenshot';
 import { ding } from '../../lib/ding';
 import type { AppSettings } from '../../types';
 
@@ -43,8 +44,12 @@ export function DesignSourcePanel({ projectUrl, appSettings, onDesignGenerated }
       const crawlResult = await firecrawl.scrapeForDesign(url);
       if (!crawlResult) throw new Error(firecrawl.error || 'Firecrawl failed');
 
-      setStatusMsg(`Analyzing design system with ${providerLabel}...`);
-      const designMd = await ai.generateDesignSystem(crawlResult.extract, crawlResult.rawHtml);
+      // Prepare up to 3 screenshot slices as visual ground truth for colors/fonts
+      setStatusMsg('Preparing screenshot for visual analysis...');
+      const screenshotSlices = await prepareScreenshotForAI(crawlResult.screenshot, 3);
+
+      setStatusMsg(`Analyzing design system with ${providerLabel}${screenshotSlices.length > 0 ? ' (with visual reference)' : ''}...`);
+      const designMd = await ai.generateDesignSystem(crawlResult.extract, crawlResult.rawHtml, screenshotSlices);
       if (!designMd) throw new Error(ai.error || 'AI failed to generate design system');
 
       onDesignGenerated(designMd);
