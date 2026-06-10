@@ -6,6 +6,7 @@
 //   (rendered colors, real fonts) instead of CSS text alone.
 
 import { useState } from 'react';
+import { usageStore } from '../lib/usage';
 
 interface FirecrawlResponse {
   success: boolean;
@@ -61,6 +62,7 @@ export function useFirecrawl(apiKey: string) {
       }
 
       const data: FirecrawlResponse = await response.json();
+      usageStore.reportScrape();
       setStatus('Design data received.');
 
       return {
@@ -98,6 +100,7 @@ export function useFirecrawl(apiKey: string) {
       }
 
       const data: FirecrawlResponse = await response.json();
+      usageStore.reportScrape();
       setStatus('Page data received.');
 
       return {
