@@ -1,3 +1,10 @@
+// src/hooks/useFirecrawl.ts
+//
+// CHANGE IN THIS VERSION:
+// - scrapeForDesign now also requests a full-page screenshot, so the design
+//   system extraction can be grounded in what the page actually looks like
+//   (rendered colors, real fonts) instead of CSS text alone.
+
 import { useState } from 'react';
 
 interface FirecrawlResponse {
@@ -16,7 +23,7 @@ export function useFirecrawl(apiKey: string) {
   const [status, setStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const scrapeForDesign = async (url: string): Promise<{ extract: Record<string, unknown>; rawHtml: string } | null> => {
+  const scrapeForDesign = async (url: string): Promise<{ extract: Record<string, unknown>; rawHtml: string; screenshot: string } | null> => {
     setLoading(true);
     setError(null);
     setStatus('Connecting to Firecrawl...');
@@ -28,7 +35,7 @@ export function useFirecrawl(apiKey: string) {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
           url,
-          formats: ['extract', 'rawHtml'],
+          formats: ['extract', 'rawHtml', 'screenshot@fullPage'],
           waitFor: 2000,
           extract: {
             schema: {
@@ -59,6 +66,7 @@ export function useFirecrawl(apiKey: string) {
       return {
         extract: (data.data?.extract as Record<string, unknown>) || {},
         rawHtml: data.data?.rawHtml || '',
+        screenshot: data.data?.screenshot || '',
       };
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
