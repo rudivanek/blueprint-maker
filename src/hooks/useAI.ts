@@ -394,10 +394,17 @@ function cleanHtml(html: string): string {
   );
 
   const cleaned = htmlWithPlaceholders
+    // RESCUE LAZY-LOADED IMAGES (must run BEFORE data-* attributes are stripped):
+    // WordPress/Elementor lazy-loaders hide real URLs in data-src / data-lazy-src /
+    // data-bg etc. Promote them to real src / style attributes so the AI sees them.
+    .replace(/\bdata-(?:src|lazy-src|lazy_src|lazysrc|original)=(["'])/gi, 'src=$1')
+    .replace(/\bdata-(?:bg|background|bg-src|background-image)=(["'])([^"']+)\1/gi, 'style=$1background-image:url($2)$1')
+    // Unwrap <noscript> instead of deleting it — lazy-loaders put the REAL
+    // <img src="..."> fallback inside noscript.
+    .replace(/<noscript\b[^>]*>([\s\S]*?)<\/noscript>/gi, '$1')
     // Big structural noise
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
     // SVG innards are huge and carry no layout info (the screenshot shows icons)
     .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, '<svg data-omitted="true"></svg>')
