@@ -1,7 +1,15 @@
+// src/components/Editor/ImportPanel.tsx
+//
+// CHANGE IN THIS VERSION:
+// - The Firecrawl full-page screenshot is now sliced (lib/screenshot.ts) and
+//   sent to the AI alongside the HTML, for both the normal import path and the
+//   WordPress/Elementor path. Compact-mode re-import reuses the same slices.
+
 import { useState, useRef } from 'react';
 import { ScanLine, Loader2, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useFirecrawl } from '../../hooks/useFirecrawl';
 import { useAI } from '../../hooks/useAI';
+import { prepareScreenshotForAI } from '../../lib/screenshot';
 import { toast } from '../ui/Toast';
 import { ding } from '../../lib/ding';
 import type { GlobalSettings, Section, AppSettings } from '../../types';
@@ -22,6 +30,8 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
   const [structureStatus, setStructureStatus] = useState<ImportStatus>('idle');
   const [currentStatus, setCurrentStatus] = useState('');
   const lastRawHtml = useRef<string | null>(null);
+  const lastScreenshotSlices = useRef<string[]>([]);
+  const lastScreenshotUrl = useRef<string | undefined>(undefined);
   const [showCompact, setShowCompact] = useState(false);
 
   const firecrawl = useFirecrawl(appSettings.firecrawlApiKey);
@@ -31,8 +41,8 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
   const hasKeys = !!(appSettings.firecrawlApiKey && activeAIKey);
   const providerLabel = appSettings.aiProvider === 'openai' ? 'OpenAI (GPT-4.1)' : 'Anthropic (Claude)';
 
-  const runImport = async (rawHtml: string, compactMode: boolean, screenshotUrl?: string) => {
-    const result = await ai.importPageStructure(rawHtml, compactMode);
+  const runImport = async (rawHtml: string, compactMode: boolean, screenshotSlices: string[], screenshotUrl?: string) => {
+    const result = await ai.importPageStructure(rawHtml, compactMode, screenshotSlices);
     if (!result) throw new Error(ai.error || 'AI failed to import structure');
 
     onStructureImported(result.sections, result.globals, screenshotUrl);
@@ -65,22 +75,30 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
       const crawlResult = await firecrawl.scrapeForStructure(url);
       if (!crawlResult) throw new Error(firecrawl.error || 'Firecrawl failed');
 
+      // Prepare screenshot slices for the AI (best effort — empty array on failure)
+      setCurrentStatus('Preparing screenshot for visual analysis...');
+      const screenshotSlices = await prepareScreenshotForAI(crawlResult.screenshot);
+      if (screenshotSlices.length === 0 && crawlResult.screenshot) {
+        toast('Screenshot could not be prepared — importing from HTML only.', 'warning');
+      }
+
       let htmlToProcess = crawlResult.rawHtml;
 
       if (isWordPress) {
         // For Elementor/WP sites rawHtml is mostly empty JS wrappers.
         // Use markdown (rendered DOM) + rawHtml (for image/video/link URLs) combined.
         setCurrentStatus('Extracting WordPress/Elementor content...');
-        const extracted = await ai.extractWordPressContent(crawlResult.rawHtml, crawlResult.markdown);
+        const extracted = await ai.extractWordPressContent(crawlResult.rawHtml, crawlResult.markdown, screenshotSlices);
         if (!extracted) throw new Error(ai.error || 'Failed to extract WordPress content');
-        // Pass the extracted content summary as the "html" — importPageStructure
-        // treats it as content to analyze, markdown or HTML both work fine
         htmlToProcess = extracted;
       }
 
       lastRawHtml.current = htmlToProcess;
+      lastScreenshotSlices.current = screenshotSlices;
+      lastScreenshotUrl.current = crawlResult.screenshot;
+
       setCurrentStatus(`Analyzing page structure with ${providerLabel}...`);
-      await runImport(htmlToProcess, false, crawlResult.screenshot);
+      await runImport(htmlToProcess, false, screenshotSlices, crawlResult.screenshot);
     } catch (e) {
       setStructureStatus('error');
       setCurrentStatus(e instanceof Error ? e.message : 'Unknown error');
@@ -93,7 +111,7 @@ export function ImportPanel({ projectUrl, pageUrl, appSettings, onStructureImpor
     setCurrentStatus('Re-importing in compact mode...');
 
     try {
-      await runImport(lastRawHtml.current, true);
+      await runImport(lastRawHtml.current, true, lastScreenshotSlices.current, lastScreenshotUrl.current);
     } catch (e) {
       setStructureStatus('error');
       setCurrentStatus(e instanceof Error ? e.message : 'Unknown error');
